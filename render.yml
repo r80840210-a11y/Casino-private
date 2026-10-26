@@ -1,0 +1,17 @@
+services:
+  - type: worker
+    name: starfun-virtual-points-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: API_BASE
+        value: http://67.211.221.152:8888
+      - key: DB_PATH
+        value: /var/data/starfun.db
+    disk:
+      name: starfun-data
+      mountPath: /var/data
+      sizeGB: 1
