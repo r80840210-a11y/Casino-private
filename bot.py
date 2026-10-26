@@ -1,171 +1,287 @@
-import asyncio, os, sqlite3, random
+import os
+import asyncio
+import random
+import sqlite3
 from datetime import datetime
-from html import escape
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.client.telegram import TelegramAPIServer
-from aiogram.filters import Command, CommandStart
-from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.filters import CommandStart, Command
+from aiogram.types import Message, CallbackQuery
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 TOKEN = os.getenv("BOT_TOKEN", "").strip()
-API_BASE = os.getenv("API_BASE", "http://67.211.221.152:8888").rstrip("/")
-DB_PATH = os.getenv("DB_PATH", "starfun.db")
-ADMIN_IDS = {int(x) for x in os.getenv("ADMIN_IDS", "1780243264").split(",") if x.strip().isdigit()}
-SUPPORT = os.getenv("SUPPORT_USERNAME", "v1nk_molik").lstrip("@")
-if not TOKEN: raise RuntimeError("Set BOT_TOKEN in Render Environment.")
+API_BASE = os.getenv("TELEGRAM_API_BASE", "http://67.211.221.152:8888").rstrip("/")
+OWNER_ID = 1780243264
+DB_PATH = os.getenv("DB_PATH", "bot.db")
 
-def connect():
-    c = sqlite3.connect(DB_PATH); c.row_factory = sqlite3.Row; return c
+if not TOKEN:
+    raise RuntimeError("Set BOT_TOKEN in Render Environment variables.")
 
-def init_db():
-    with connect() as c:
-        c.executescript("""
-        CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, name TEXT, username TEXT, balance INTEGER DEFAULT 0, games INTEGER DEFAULT 0, wins INTEGER DEFAULT 0);
-        CREATE TABLE IF NOT EXISTS promos(code TEXT PRIMARY KEY, reward INTEGER, limit_uses INTEGER, uses INTEGER DEFAULT 0);
-        CREATE TABLE IF NOT EXISTS promo_users(code TEXT, user_id INTEGER, PRIMARY KEY(code,user_id));
-        CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT);
-        INSERT OR IGNORE INTO settings VALUES('min_exchange','100');
-        """)
+conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+conn.row_factory = sqlite3.Row
+cur = conn.cursor()
+cur.executescript("""
+CREATE TABLE IF NOT EXISTS users(
+ id INTEGER PRIMARY KEY, username TEXT, first_name TEXT, balance INTEGER NOT NULL DEFAULT 0,
+ wins INTEGER NOT NULL DEFAULT 0, losses INTEGER NOT NULL DEFAULT 0, banned INTEGER NOT NULL DEFAULT 0,
+ created_at TEXT
+);
+CREATE TABLE IF NOT EXISTS admins(id INTEGER PRIMARY KEY);
+CREATE TABLE IF NOT EXISTS promos(
+ code TEXT PRIMARY KEY, amount INTEGER NOT NULL, max_uses INTEGER NOT NULL, uses INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS promo_uses(user_id INTEGER, code TEXT, PRIMARY KEY(user_id, code));
+CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT);
+""")
+cur.execute("INSERT OR IGNORE INTO admins(id) VALUES(?)", (OWNER_ID,))
+cur.execute("INSERT OR IGNORE INTO settings(key,value) VALUES('win_chance','35')")
+conn.commit()
 
-def ensure(u):
-    with connect() as c:
-        c.execute("INSERT INTO users(id,name,username,balance) VALUES(?,?,?,0) ON CONFLICT(id) DO UPDATE SET name=excluded.name,username=excluded.username",(u.id,u.full_name,u.username or ""))
+def is_admin(uid):
+    return conn.execute("SELECT 1 FROM admins WHERE id=?", (uid,)).fetchone() is not None
 
-def get_user(uid):
-    with connect() as c: return c.execute("SELECT * FROM users WHERE id=?",(uid,)).fetchone()
+def ensure_user(u):
+    conn.execute("""INSERT OR IGNORE INTO users(id,username,first_name,created_at)
+                    VALUES(?,?,?,?)""",
+                 (u.id, u.username or "", u.first_name or "", datetime.utcnow().isoformat()))
+    conn.execute("UPDATE users SET username=?, first_name=? WHERE id=?",
+                 (u.username or "", u.first_name or "", u.id))
+    conn.commit()
 
-def menu():
-    return ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🎮 Играть"),KeyboardButton(text="👤 Профиль")],[KeyboardButton(text="⭐ Пополнить баланс")]],resize_keyboard=True)
+def user_row(uid):
+    return conn.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
+
+def kb_main(uid):
+    b = InlineKeyboardBuilder()
+    b.button(text="⭐ Апгрейд", callback_data="upgrade")
+    b.button(text="👤 Профиль", callback_data="profile")
+    b.button(text="🎟 Активировать промокод", callback_data="promo")
+    b.adjust(1)
+    return b.as_markup()
 
 def admin_kb():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="➕ Начислить баланс",callback_data="givehelp")],
-        [InlineKeyboardButton(text="🎟 Создать промокод",callback_data="promohelp")],
-        [InlineKeyboardButton(text="📊 Статистика",callback_data="stats")],
-        [InlineKeyboardButton(text="⚙️ Минимум обмена",callback_data="minhelp")]])
+    b = InlineKeyboardBuilder()
+    b.button(text="➕ Добавить админа", callback_data="adm_add")
+    b.button(text="➖ Удалить админа", callback_data="adm_remove")
+    b.button(text="⛔ Забанить", callback_data="adm_ban")
+    b.button(text="✅ Разбанить", callback_data="adm_unban")
+    b.button(text="⭐ Выдать очки", callback_data="adm_give")
+    b.button(text="➖ Забрать очки", callback_data="adm_take")
+    b.button(text="🎟 Создать промокод", callback_data="adm_promo")
+    b.button(text="📣 Рассылка", callback_data="adm_broadcast")
+    b.button(text="📊 Статистика", callback_data="adm_stats")
+    b.adjust(1)
+    return b.as_markup()
 
-bot = Bot(TOKEN, session=AiohttpSession(api=TelegramAPIServer.from_base(API_BASE)))
-dp = Dispatcher()
+# One-step admin conversations are kept in memory; persistent data is in SQLite.
 pending = {}
 
-@dp.message(CommandStart())
-async def start(m):
-    ensure(m.from_user); u=get_user(m.from_user.id)
-    await m.answer(f"⭐ <b>StarFun</b>\n\nДобро пожаловать в казино звёзд! ⭐\n💰 Баланс: <b>{u['balance']} ⭐</b>",reply_markup=menu(),parse_mode="HTML")
+async def allowed(event):
+    uid = event.from_user.id
+    ensure_user(event.from_user)
+    row = user_row(uid)
+    if row and row["banned"]:
+        if isinstance(event, CallbackQuery):
+            await event.answer("Ваш аккаунт заблокирован.", show_alert=True)
+        else:
+            await event.answer("Ваш аккаунт заблокирован.")
+        return False
+    return True
 
-@dp.message(Command("profile"))
-@dp.message(F.text=="👤 Профиль")
-async def profile(m):
-    ensure(m.from_user); u=get_user(m.from_user.id)
-    await m.answer(f"👤 <b>Профиль StarFun</b>\n\nИмя: {escape(u['name'] or '')}\nUsername: @{escape(u['username'] or 'не указан')}\nID: <code>{u['id']}</code>\n💰 Баланс: <b>{u['balance']} ⭐</b>\n🎮 Игр: {u['games']}\n✅ Верных ответов: {u['wins']}",
-      reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎟 Активировать промокод",callback_data="promo")]]),parse_mode="HTML")
+async def start_handler(message: Message):
+    if not await allowed(message): return
+    await message.answer(
+        "⭐ **StarPlay**\n\nВыберите раздел в меню ниже.",
+        reply_markup=kb_main(message.from_user.id), parse_mode="Markdown"
+    )
 
-@dp.message(F.text=="⭐ Пополнить баланс")
-async def topup(m):
-    await m.answer("⭐ <b>Пополнение игрового баланса</b>\n\nПо вопросам игрового баланса напиши администратору @"+escape(SUPPORT)+".",parse_mode="HTML",
-      reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✉️ Написать администратору",url=f"https://t.me/{SUPPORT}")]]))
+async def profile_handler(call: CallbackQuery):
+    if not await allowed(call): return
+    u = user_row(call.from_user.id)
+    await call.message.edit_text(
+        f"👤 **Профиль**\n\n"
+        f"🆔 ID: `{u['id']}`\n"
+        f"⭐ Баланс очков: **{u['balance']}**\n"
+        f"🏆 Побед: {u['wins']}\n"
+        f"💥 Поражений: {u['losses']}\n\n"
+        "Промокод можно активировать кнопкой в главном меню.",
+        parse_mode="Markdown", reply_markup=kb_main(call.from_user.id)
+    )
+    await call.answer()
 
-@dp.message(Command("game"))
-@dp.message(F.text=="🎮 Играть")
-async def game(m):
-    ensure(m.from_user); a,b=random.randint(2,12),random.randint(2,12); ans=a*b
-    pending[m.from_user.id]={"answer":ans}
-    options=list({ans, max(1,ans+random.choice([-5,-3,2,4])),max(1,ans+random.choice([-4,-2,3,5]))})
-    random.shuffle(options)
-    await m.answer(f"🎮 <b>Мини-игра</b>\nСколько будет {a} × {b}?\nЗа правильный ответ начисляется 10 ⭐. Попытка бесплатная.",
-      reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=str(x),callback_data=f"ans:{x}") for x in options]]),parse_mode="HTML")
+async def upgrade_handler(call: CallbackQuery):
+    if not await allowed(call): return
+    b = InlineKeyboardBuilder()
+    for n in (5, 10, 25, 50, 100):
+        b.button(text=f"{n} очков", callback_data=f"stake:{n}")
+    b.button(text="⬅️ Назад", callback_data="home")
+    b.adjust(2, 2, 1, 1)
+    await call.message.edit_text(
+        "⭐ **Апгрейд очков**\n\n"
+        "Выберите ставку. При победе начисляется x1.5 от ставки; при проигрыше ставка списывается.\n"
+        "Это режим на игровые очки без покупки и вывода денег.",
+        parse_mode="Markdown", reply_markup=b.as_markup()
+    )
+    await call.answer()
 
-@dp.callback_query(F.data.startswith("ans:"))
-async def answer(q):
-    state=pending.pop(q.from_user.id,None)
-    if not state: await q.answer("Начни новую игру.",show_alert=True); return
-    val=int(q.data.split(":")[1]); ok=val==state["answer"]
-    with connect() as c:
-        c.execute("UPDATE users SET games=games+1 WHERE id=?",(q.from_user.id,))
-        if ok: c.execute("UPDATE users SET balance=balance+10,wins=wins+1 WHERE id=?",(q.from_user.id,))
-    await q.message.edit_text("✅ Верно! Начислено 10 ⭐." if ok else f"❌ Неверно. Ответ: {state['answer']}.")
-    await q.answer()
-
-@dp.callback_query(F.data=="promo")
-async def promo_begin(q):
-    pending[q.from_user.id]={"promo":True}; await q.message.answer("Отправь название промокода одним сообщением."); await q.answer()
-
-async def redeem(m,code):
-    code=code.strip().upper(); uid=m.from_user.id
-    with connect() as c:
-        p=c.execute("SELECT * FROM promos WHERE code=?",(code,)).fetchone()
-        if not p: await m.answer("❌ Промокод не найден."); return
-        if p["uses"]>=p["limit_uses"]: await m.answer("❌ Лимит активаций исчерпан."); return
-        if c.execute("SELECT 1 FROM promo_users WHERE code=? AND user_id=?",(code,uid)).fetchone():
-            await m.answer("❌ Ты уже активировал этот промокод."); return
-        c.execute("INSERT INTO promo_users VALUES(?,?)",(code,uid)); c.execute("UPDATE promos SET uses=uses+1 WHERE code=?",(code,))
-        c.execute("UPDATE users SET balance=balance+? WHERE id=?",(p["reward"],uid))
-    pending.pop(uid,None); await m.answer(f"✅ Промокод активирован! +{p['reward']} ⭐")
-
-@dp.message(Command("promo"))
-async def promo_cmd(m):
-    args=m.text.split(maxsplit=1)
-    if len(args)>1: await redeem(m,args[1])
-    else: pending[m.from_user.id]={"promo":True}; await m.answer("Отправь название промокода.")
-
-@dp.message(Command("admin"))
-async def admin(m):
-    if m.from_user.id not in ADMIN_IDS: await m.answer("⛔ Нет доступа."); return
-    await m.answer("🛠 <b>StarFun — админ-панель</b>\n\n/give ID СУММА\n/newpromo КОД НАГРАДА ЛИМИТ\n/setmin СУММА",reply_markup=admin_kb(),parse_mode="HTML")
-
-@dp.callback_query(F.data.in_({"givehelp","promohelp","minhelp","stats"}))
-async def admin_buttons(q):
-    if q.from_user.id not in ADMIN_IDS: await q.answer("Нет доступа",show_alert=True); return
-    if q.data=="givehelp": msg="Формат: /give ID СУММА"
-    elif q.data=="promohelp": msg="Формат: /newpromo КОД НАГРАДА ЛИМИТ"
-    elif q.data=="minhelp": msg="Формат: /setmin СУММА"
+async def stake_handler(call: CallbackQuery):
+    if not await allowed(call): return
+    stake = int(call.data.split(":")[1])
+    u = user_row(call.from_user.id)
+    if u["balance"] < stake:
+        await call.answer("Недостаточно очков. Баланс можно получить из промокода или от администратора.", show_alert=True)
+        return
+    chance = int(conn.execute("SELECT value FROM settings WHERE key='win_chance'").fetchone()[0])
+    won = random.randint(1, 100) <= chance
+    if won:
+        payout = int(stake * 1.5)
+        conn.execute("UPDATE users SET balance=balance+?, wins=wins+1 WHERE id=?", (payout - stake, call.from_user.id))
+        result = f"🎉 Победа! Начислено **{payout}** очков (x1.5)."
     else:
-        with connect() as c:
-            n=c.execute("SELECT COUNT(*) FROM users").fetchone()[0]; bal=c.execute("SELECT COALESCE(SUM(balance),0) FROM users").fetchone()[0]
-        msg=f"📊 Пользователей: {n}\nСуммарный игровой баланс: {bal} ⭐"
-    await q.message.answer(msg); await q.answer()
+        conn.execute("UPDATE users SET balance=balance-?, losses=losses+1 WHERE id=?", (stake, call.from_user.id))
+        result = f"💥 Неудача. Списано **{stake}** очков."
+    conn.commit()
+    u = user_row(call.from_user.id)
+    b = InlineKeyboardBuilder()
+    b.button(text="🔁 Ещё раз", callback_data="upgrade")
+    b.button(text="👤 Профиль", callback_data="profile")
+    b.button(text="🏠 Меню", callback_data="home")
+    b.adjust(1)
+    await call.message.edit_text(f"{result}\n\n⭐ Баланс: **{u['balance']}**", parse_mode="Markdown", reply_markup=b.as_markup())
+    await call.answer()
 
-@dp.message(Command("give"))
-async def give(m):
-    if m.from_user.id not in ADMIN_IDS: await m.answer("⛔ Нет доступа."); return
-    a=m.text.split()
-    if len(a)!=3 or not a[1].isdigit() or not a[2].isdigit() or int(a[2])<1: await m.answer("Формат: /give ID СУММА"); return
-    if not get_user(int(a[1])): await m.answer("Пользователь должен сначала нажать /start."); return
-    with connect() as c: c.execute("UPDATE users SET balance=balance+? WHERE id=?",(int(a[2]),int(a[1])))
-    await m.answer(f"✅ Начислено {a[2]} ⭐ игрового баланса.")
+async def home_handler(call: CallbackQuery):
+    if not await allowed(call): return
+    await call.message.edit_text("⭐ **StarPlay**\n\nВыберите раздел:", parse_mode="Markdown", reply_markup=kb_main(call.from_user.id))
+    await call.answer()
 
-@dp.message(Command("newpromo"))
-async def newpromo(m):
-    if m.from_user.id not in ADMIN_IDS: await m.answer("⛔ Нет доступа."); return
-    a=m.text.split()
-    if len(a)!=4 or not a[2].isdigit() or not a[3].isdigit() or int(a[2])<1 or int(a[3])<1:
-        await m.answer("Формат: /newpromo КОД НАГРАДА ЛИМИТ"); return
+async def promo_handler(call: CallbackQuery):
+    if not await allowed(call): return
+    pending[call.from_user.id] = ("promo", None)
+    await call.message.answer("Отправьте название промокода одним сообщением.")
+    await call.answer()
+
+async def admin_handler(message: Message):
+    if not await allowed(message): return
+    if not is_admin(message.from_user.id):
+        await message.answer("Нет доступа.")
+        return
+    await message.answer("🛠 **Админ-панель**", parse_mode="Markdown", reply_markup=admin_kb())
+
+async def admin_button(call: CallbackQuery):
+    if not await allowed(call): return
+    if not is_admin(call.from_user.id):
+        await call.answer("Нет доступа", show_alert=True); return
+    actions = {
+        "adm_add": ("add_admin", "Введите Telegram ID пользователя, которого нужно сделать админом."),
+        "adm_remove": ("remove_admin", "Введите Telegram ID админа, которого нужно удалить."),
+        "adm_ban": ("ban", "Введите Telegram ID пользователя для блокировки."),
+        "adm_unban": ("unban", "Введите Telegram ID пользователя для разблокировки."),
+        "adm_give": ("give", "Введите ID пользователя и количество через пробел: `123456 100`."),
+        "adm_take": ("take", "Введите ID пользователя и количество через пробел: `123456 100`."),
+        "adm_promo": ("make_promo", "Введите данные промокода через пробел: `КОД количество_очков число_активаций`."),
+        "adm_broadcast": ("broadcast", "Отправьте текст рассылки следующим сообщением."),
+    }
+    if call.data == "adm_stats":
+        count = conn.execute("SELECT COUNT(*) n FROM users").fetchone()["n"]
+        total = conn.execute("SELECT COALESCE(SUM(balance),0) n FROM users").fetchone()["n"]
+        await call.message.answer(f"📊 Пользователей: {count}\nВсего очков на балансах: {total}")
+        await call.answer(); return
+    action, prompt = actions[call.data]
+    pending[call.from_user.id] = (action, None)
+    await call.message.answer(prompt, parse_mode="Markdown")
+    await call.answer()
+
+async def text_handler(message: Message):
+    if not await allowed(message): return
+    item = pending.get(message.from_user.id)
+    if not item: return
+    action, _ = item
+    text = (message.text or "").strip()
+    if action == "promo":
+        code = text.upper()
+        promo = conn.execute("SELECT * FROM promos WHERE code=?", (code,)).fetchone()
+        used = conn.execute("SELECT 1 FROM promo_uses WHERE user_id=? AND code=?", (message.from_user.id, code)).fetchone()
+        if not promo or promo["uses"] >= promo["max_uses"]:
+            await message.answer("Промокод не найден или лимит активаций исчерпан.")
+        elif used:
+            await message.answer("Вы уже активировали этот промокод.")
+        else:
+            conn.execute("UPDATE users SET balance=balance+? WHERE id=?", (promo["amount"], message.from_user.id))
+            conn.execute("UPDATE promos SET uses=uses+1 WHERE code=?", (code,))
+            conn.execute("INSERT INTO promo_uses(user_id,code) VALUES(?,?)", (message.from_user.id, code))
+            conn.commit()
+            await message.answer(f"✅ Промокод активирован! Начислено {promo['amount']} очков.")
+        pending.pop(message.from_user.id, None); return
+    if not is_admin(message.from_user.id):
+        pending.pop(message.from_user.id, None); return
     try:
-        with connect() as c: c.execute("INSERT INTO promos(code,reward,limit_uses) VALUES(?,?,?)",(a[1].upper(),int(a[2]),int(a[3])))
-        await m.answer(f"✅ Промокод {a[1].upper()} создан. Награда: {a[2]} ⭐, активаций: {a[3]}.")
-    except sqlite3.IntegrityError: await m.answer("Такой промокод уже существует.")
-
-@dp.message(Command("setmin"))
-async def setmin(m):
-    if m.from_user.id not in ADMIN_IDS: await m.answer("⛔ Нет доступа."); return
-    a=m.text.split()
-    if len(a)!=2 or not a[1].isdigit(): await m.answer("Формат: /setmin СУММА"); return
-    with connect() as c: c.execute("INSERT INTO settings VALUES('min_exchange',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(a[1],))
-    await m.answer(f"✅ Минимальный порог обмена установлен: {a[1]} ⭐.")
-
-@dp.message(Command("help"))
-async def help_cmd(m):
-    await m.answer("/start — меню\n/profile — профиль\n/game — мини-игра\n/promo — промокод\n/admin — админ-панель")
-
-@dp.message()
-async def fallback(m):
-    state=pending.get(m.from_user.id)
-    if state and state.get("promo"): await redeem(m,m.text or ""); return
-    await m.answer("Выбери раздел в меню.",reply_markup=menu())
+        if action in ("add_admin", "remove_admin", "ban", "unban"):
+            uid = int(text)
+            if action == "add_admin":
+                conn.execute("INSERT OR IGNORE INTO admins(id) VALUES(?)", (uid,)); msg = "Админ добавлен."
+            elif action == "remove_admin":
+                if uid == OWNER_ID: raise ValueError("Главного администратора удалить нельзя.")
+                conn.execute("DELETE FROM admins WHERE id=?", (uid,)); msg = "Админ удалён."
+            elif action == "ban":
+                conn.execute("UPDATE users SET banned=1 WHERE id=?", (uid,)); msg = "Пользователь заблокирован (если он уже запускал бота)."
+            else:
+                conn.execute("UPDATE users SET banned=0 WHERE id=?", (uid,)); msg = "Пользователь разблокирован."
+        elif action in ("give", "take"):
+            uid_s, amount_s = text.split()
+            uid, amount = int(uid_s), int(amount_s)
+            if amount <= 0: raise ValueError("Количество должно быть больше нуля.")
+            ensure = conn.execute("SELECT id FROM users WHERE id=?", (uid,)).fetchone()
+            if not ensure: raise ValueError("Пользователь ещё не запускал бота.")
+            delta = amount if action == "give" else -amount
+            if action == "take" and user_row(uid)["balance"] < amount: raise ValueError("У пользователя недостаточно очков.")
+            conn.execute("UPDATE users SET balance=balance+? WHERE id=?", (delta, uid))
+            msg = "Баланс обновлён."
+        elif action == "make_promo":
+            code, amount_s, uses_s = text.split()
+            amount, uses = int(amount_s), int(uses_s)
+            if amount <= 0 or uses <= 0: raise ValueError("Количество очков и активаций должны быть больше нуля.")
+            conn.execute("INSERT INTO promos(code,amount,max_uses) VALUES(?,?,?)", (code.upper(), amount, uses))
+            msg = f"Промокод {code.upper()} создан: {amount} очков, активаций: {uses}."
+        elif action == "broadcast":
+            pending.pop(message.from_user.id, None)
+            rows = conn.execute("SELECT id FROM users WHERE banned=0").fetchall()
+            ok = 0
+            for row in rows:
+                try:
+                    await bot.send_message(row["id"], text)
+                    ok += 1
+                except Exception:
+                    pass
+            await message.answer(f"Рассылка завершена: доставлено {ok} из {len(rows)}.")
+            return
+        else:
+            msg = "Неизвестное действие."
+        conn.commit()
+        await message.answer("✅ " + msg, reply_markup=admin_kb())
+    except sqlite3.IntegrityError:
+        await message.answer("Ошибка: такой промокод уже существует.")
+    except Exception as e:
+        await message.answer("Ошибка: " + str(e))
+    finally:
+        pending.pop(message.from_user.id, None)
 
 async def main():
-    init_db()
-    print("StarFun started")
+    global bot
+    session = AiohttpSession(api=TelegramAPIServer.from_base(API_BASE))
+    bot = Bot(TOKEN, session=session)
+    dp = Dispatcher()
+    dp.message.register(start_handler, CommandStart())
+    dp.message.register(admin_handler, Command("admin"))
+    dp.message.register(text_handler, F.text)
+    dp.callback_query.register(profile_handler, F.data == "profile")
+    dp.callback_query.register(upgrade_handler, F.data == "upgrade")
+    dp.callback_query.register(stake_handler, F.data.startswith("stake:"))
+    dp.callback_query.register(home_handler, F.data == "home")
+    dp.callback_query.register(promo_handler, F.data == "promo")
+    dp.callback_query.register(admin_button, F.data.startswith("adm_"))
     await dp.start_polling(bot)
 
-if __name__=="__main__": asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())

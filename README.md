@@ -1,38 +1,33 @@
-# StarFun — Telegram bot с виртуальными очками
+# StarPlay Telegram Bot
 
-Демо-игра с виртуальными очками. Очки не являются деньгами или Telegram Stars; покупка, продажа, вывод и обмен очков на реальные ценности не реализованы.
+Python + aiogram 3 bot with SQLite storage, designed to run as a Render Background Worker.
 
-## Возможности
-- Игровые раунды со ставкой виртуальных очков
-- Профиль: Telegram ID, баланс, победы и поражения
-- Бесплатное начисление 100 очков кнопкой
-- Админ-панель: выдать/забрать очки, бан/разбан, админы, рассылка, статистика
-- SQLite база данных
-- Render Worker и конфигурация для GitHub
+## Included
+- User profile with Telegram ID, points balance, wins and losses
+- Upgrade game using **non-purchasable, non-withdrawable game points**
+- Promo codes with a limited number of activations
+- Admin panel: add/remove admins, ban/unban, issue/remove points, promo creation, broadcast and basic stats
+- Owner admin ID is `1780243264`
+- Custom Telegram Bot API base URL setting
 
-## Запуск локально
-1. Установи Python 3.11+.
-2. `pip install -r requirements.txt`
-3. Создай бота через BotFather и задай переменную `BOT_TOKEN`.
-4. При необходимости задай `API_BASE=http://67.211.221.152:8888`.
-5. `python bot.py`
+## Important
+This project intentionally uses **game points only**. It does not process payments, accept deposits, or enable real-value withdrawals. Do not use it to take Telegram Stars or money as gambling stakes.
 
-## Render + GitHub
-1. Загрузи содержимое ZIP в GitHub.
-2. В Render выбери **New + → Blueprint** и подключи репозиторий.
-3. В Environment добавь `BOT_TOKEN` — токен от BotFather.
-4. Render создаст Worker; порт открывать не нужно, потому что бот работает через polling, а не HTTP-сервер.
-5. Для сохранения SQLite нужен persistent disk, он описан в `render.yaml`.
+## Setup
+1. Create a bot token with BotFather on the Telegram network your server supports.
+2. Upload this project to a GitHub repository.
+3. In Render, create a **Background Worker** from the repository.
+4. Set environment variable `BOT_TOKEN` to your bot token.
+5. `TELEGRAM_API_BASE` is prefilled in `render.yaml`; change it if your custom API server uses a different base URL.
+6. Deploy. The bot starts with zero points; the owner can use `/admin` and issue points to users.
 
-## Важно про API_BASE
-Этот проект использует указанный тобой адрес как Telegram Bot API endpoint через aiogram. Это сработает только если сервер действительно совместим с Telegram Bot API и поддерживает методы ботов. Сам по себе адрес не является токеном бота.
+## Custom API server note
+`TELEGRAM_API_BASE` must point to a compatible Telegram Bot API server base URL. If your endpoint is not a standard Bot API-compatible endpoint, bot requests will fail. Render's worker does not need an inbound web port, so no `PORT` setting is required.
 
-## Администратор
-ID `1780243264` добавлен администратором по умолчанию. Другие админы управляются из `/admin`.
+## Admin commands
+- `/admin` — open the admin panel
+- Admin prompts guide you through each action.
+- Admins can issue points only to users who have started the bot.
 
-## Команды
-- `/start` — главное меню
-- `/admin` — панель администратора (только админы)
-
-## Безопасность
-Не публикуй `BOT_TOKEN` в GitHub. Если токен уже попал в репозиторий, отзови его через BotFather и создай новый.
+## Persistence
+The included SQLite database is suitable for a simple test deployment. Render's local filesystem can be ephemeral; for persistent production data, attach a persistent disk or switch to PostgreSQL.
