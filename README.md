@@ -1,33 +1,47 @@
-# StarPlay Telegram Bot
+# 🎰 Telegram Casino Bot
 
-Python + aiogram 3 bot with SQLite storage, designed to run as a Render Background Worker.
+Бот-казино с Telegram Stars. Апгрейд, профиль, промокоды, админ-панель.
 
-## Included
-- User profile with Telegram ID, points balance, wins and losses
-- Upgrade game using **non-purchasable, non-withdrawable game points**
-- Promo codes with a limited number of activations
-- Admin panel: add/remove admins, ban/unban, issue/remove points, promo creation, broadcast and basic stats
-- Owner admin ID is `1780243264`
-- Custom Telegram Bot API base URL setting
+## 🚀 Деплой на Render
 
-## Important
-This project intentionally uses **game points only**. It does not process payments, accept deposits, or enable real-value withdrawals. Do not use it to take Telegram Stars or money as gambling stakes.
+1. **Создай бота** у [@BotFather](https://t.me/BotFather), получи токен
 
-## Setup
-1. Create a bot token with BotFather on the Telegram network your server supports.
-2. Upload this project to a GitHub repository.
-3. In Render, create a **Background Worker** from the repository.
-4. Set environment variable `BOT_TOKEN` to your bot token.
-5. `TELEGRAM_API_BASE` is prefilled in `render.yaml`; change it if your custom API server uses a different base URL.
-6. Deploy. The bot starts with zero points; the owner can use `/admin` and issue points to users.
+2. **Залей код на GitHub**:
+   ```bash
+   git init
+   git add .
+   git commit -m "Casino bot"
+   git remote add origin https://github.com/ТВОЙ_НИК/ТВОЙ_РЕПО.git
+   git push -u origin main
+   ```
 
-## Custom API server note
-`TELEGRAM_API_BASE` must point to a compatible Telegram Bot API server base URL. If your endpoint is not a standard Bot API-compatible endpoint, bot requests will fail. Render's worker does not need an inbound web port, so no `PORT` setting is required.
+3. **На Render.com**:
+   - New → Background Worker
+   - Connect GitHub repo
+   - Build Command: `pip install -r requirements.txt`
+   - Start Command: `python main.py`
+   - Add Environment Variable: `BOT_TOKEN` = твой токен
+   - Deploy!
 
-## Admin commands
-- `/admin` — open the admin panel
-- Admin prompts guide you through each action.
-- Admins can issue points only to users who have started the bot.
+## ⚙️ Локальный запуск
 
-## Persistence
-The included SQLite database is suitable for a simple test deployment. Render's local filesystem can be ephemeral; for persistent production data, attach a persistent disk or switch to PostgreSQL.
+```bash
+pip install -r requirements.txt
+export BOT_TOKEN="твой_токен"
+python main.py
+```
+
+## 👑 Админ-панель
+
+Главный админ ID: `1780243264` (автоматически)
+
+Команды в боте: `/admin`
+
+## 🎮 Функции
+
+- 🎰 Апгрейд звезд (шанс победы ~35%)
+- 💰 Профиль со статистикой
+- 💳 Пополнение через @v1nk_molik
+- 💸 Вывод звезд (мин. сумма настраивается)
+- 🎁 Промокоды
+- 👑 Админ-панель (выдача/забор звезд, бан, рассылка)
