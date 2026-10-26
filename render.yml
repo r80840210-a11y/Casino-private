@@ -2,8 +2,8 @@ services:
   - type: worker
     name: starfun-bot
     runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python bot.py
+    buildCommand: pip install -r starfun_upgrader_requirements.txt
+    startCommand: python starfun_upgrader_bot.py
     envVars:
       - key: BOT_TOKEN
         sync: false
