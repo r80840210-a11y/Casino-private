@@ -1,6 +1,6 @@
 services:
   - type: worker
-    name: starfun-virtual-points-bot
+    name: starfun-bot
     runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: python bot.py
