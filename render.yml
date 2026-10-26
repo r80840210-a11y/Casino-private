@@ -9,6 +9,10 @@ services:
         sync: false
       - key: API_BASE
         value: http://67.211.221.152:8888
+      - key: ADMIN_IDS
+        value: "1780243264"
+      - key: SUPPORT_USERNAME
+        value: "v1nk_molik"
       - key: DB_PATH
         value: /var/data/starfun.db
     disk:
