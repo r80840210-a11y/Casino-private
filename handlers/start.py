@@ -22,15 +22,9 @@ async def cmd_start(message: Message):
         return
 
     await message.answer(
-        f"👋 Привет, {first_name}!
-
-"
-        f"🎰 Добро пожаловать в Stars Casino!
-
-"
-        f"💰 Твой баланс: <b>{db.get_balance(user_id)} ⭐</b>
-
-"
+        f"👋 Привет, {first_name}!\n\n"
+        f"🎰 Добро пожаловать в Stars Casino!\n\n"
+        f"💰 Твой баланс: <b>{db.get_balance(user_id)} ⭐</b>\n\n"
         f"Выбери действие:",
         reply_markup=main_menu_keyboard()
     )
@@ -44,12 +38,8 @@ async def back_to_main(callback: CallbackQuery):
         return
 
     await callback.message.edit_text(
-        f"🎰 <b>Stars Casino</b>
-
-"
-        f"💰 Твой баланс: <b>{db.get_balance(user_id)} ⭐</b>
-
-"
+        f"🎰 <b>Stars Casino</b>\n\n"
+        f"💰 Твой баланс: <b>{db.get_balance(user_id)} ⭐</b>\n\n"
         f"Выбери действие:",
         reply_markup=main_menu_keyboard()
     )
