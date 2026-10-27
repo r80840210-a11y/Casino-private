@@ -41,24 +41,14 @@ async def admin_panel(message: Message):
     stats = db.get_stats()
 
     await message.answer(
-        f"👑 <b>АДМИН ПАНЕЛЬ</b>
-
-"
-        f"📊 <b>Статистика:</b>
-"
-        f"👥 Всего пользователей: {stats['total_users']}
-"
-        f"🔨 Забанено: {stats['banned']}
-"
-        f"👑 Админов: {stats['admins']}
-"
-        f"🎮 Всего игр: {stats['total_games']}
-"
-        f"💰 Всего звезд в боте: {stats['total_stars']} ⭐
-"
-        f"🎁 Активных промокодов: {stats['active_promos']}
-
-"
+        f"👑 <b>АДМИН ПАНЕЛЬ</b>\n\n"
+        f"📊 <b>Статистика:</b>\n"
+        f"👥 Всего пользователей: {stats['total_users']}\n"
+        f"🔨 Забанено: {stats['banned']}\n"
+        f"👑 Админов: {stats['admins']}\n"
+        f"🎮 Всего игр: {stats['total_games']}\n"
+        f"💰 Всего звезд в боте: {stats['total_stars']} ⭐\n"
+        f"🎁 Активных промокодов: {stats['active_promos']}\n\n"
         f"Выбери действие:",
         reply_markup=admin_keyboard()
     )
@@ -72,24 +62,14 @@ async def admin_panel_callback(callback: CallbackQuery):
     stats = db.get_stats()
 
     await callback.message.edit_text(
-        f"👑 <b>АДМИН ПАНЕЛЬ</b>
-
-"
-        f"📊 <b>Статистика:</b>
-"
-        f"👥 Всего пользователей: {stats['total_users']}
-"
-        f"🔨 Забанено: {stats['banned']}
-"
-        f"👑 Админов: {stats['admins']}
-"
-        f"🎮 Всего игр: {stats['total_games']}
-"
-        f"💰 Всего звезд в боте: {stats['total_stars']} ⭐
-"
-        f"🎁 Активных промокодов: {stats['active_promos']}
-
-"
+        f"👑 <b>АДМИН ПАНЕЛЬ</b>\n\n"
+        f"📊 <b>Статистика:</b>\n"
+        f"👥 Всего пользователей: {stats['total_users']}\n"
+        f"🔨 Забанено: {stats['banned']}\n"
+        f"👑 Админов: {stats['admins']}\n"
+        f"🎮 Всего игр: {stats['total_games']}\n"
+        f"💰 Всего звезд в боте: {stats['total_stars']} ⭐\n"
+        f"🎁 Активных промокодов: {stats['active_promos']}\n\n"
         f"Выбери действие:",
         reply_markup=admin_keyboard()
     )
@@ -102,9 +82,7 @@ async def admin_add_start(callback: CallbackQuery, state: FSMContext):
         return
 
     await callback.message.edit_text(
-        "➕ <b>ДОБАВИТЬ АДМИНА</b>
-
-"
+        "➕ <b>ДОБАВИТЬ АДМИНА</b>\n\n"
         "Введи ID пользователя:",
         reply_markup=cancel_keyboard()
     )
@@ -139,17 +117,11 @@ async def admin_remove_start(callback: CallbackQuery, state: FSMContext):
         return
 
     admins = db.get_all_admins()
-    admins_text = "
-".join([f"• <code>{a['user_id']}</code> (@{a['username'] or 'нет'})" for a in admins])
+    admins_text = "\n".join([f"• <code>{a['user_id']}</code> (@{a['username'] or 'нет'})" for a in admins])
 
     await callback.message.edit_text(
-        f"➖ <b>УДАЛИТЬ АДМИНА</b>
-
-"
-        f"Текущие админы:
-{admins_text}
-
-"
+        f"➖ <b>УДАЛИТЬ АДМИНА</b>\n\n"
+        f"Текущие админы:\n{admins_text}\n\n"
         f"Введи ID админа для удаления:",
         reply_markup=cancel_keyboard()
     )
@@ -189,9 +161,7 @@ async def admin_ban_start(callback: CallbackQuery, state: FSMContext):
         return
 
     await callback.message.edit_text(
-        "🔨 <b>ЗАБАНИТЬ ПОЛЬЗОВАТЕЛЯ</b>
-
-"
+        "🔨 <b>ЗАБАНИТЬ ПОЛЬЗОВАТЕЛЯ</b>\n\n"
         "Введи ID пользователя:",
         reply_markup=cancel_keyboard()
     )
@@ -231,9 +201,7 @@ async def admin_unban_start(callback: CallbackQuery, state: FSMContext):
         return
 
     await callback.message.edit_text(
-        "🔓 <b>РАЗБАНИТЬ ПОЛЬЗОВАТЕЛЯ</b>
-
-"
+        "🔓 <b>РАЗБАНИТЬ ПОЛЬЗОВАТЕЛЯ</b>\n\n"
         "Введи ID пользователя:",
         reply_markup=cancel_keyboard()
     )
@@ -268,9 +236,7 @@ async def admin_give_start(callback: CallbackQuery, state: FSMContext):
         return
 
     await callback.message.edit_text(
-        "💰 <b>ВЫДАТЬ ЗВЕЗДЫ</b>
-
-"
+        "💰 <b>ВЫДАТЬ ЗВЕЗДЫ</b>\n\n"
         "Введи ID пользователя:",
         reply_markup=cancel_keyboard()
     )
@@ -297,11 +263,8 @@ async def admin_give_id_process(message: Message, state: FSMContext):
 
     await state.update_data(target_user_id=user_id)
     await message.answer(
-        f"💰 Выдача звезд пользователю <code>{user_id}</code>
-"
-        f"💵 Текущий баланс: {user['balance']} ⭐
-
-"
+        f"💰 Выдача звезд пользователю <code>{user_id}</code>\n"
+        f"💵 Текущий баланс: {user['balance']} ⭐\n\n"
         f"Введи количество звезд:",
         reply_markup=cancel_keyboard()
     )
@@ -330,8 +293,7 @@ async def admin_give_amount_process(message: Message, state: FSMContext):
     new_balance = db.get_balance(user_id)
 
     await message.answer(
-        f"✅ Выдано <b>{amount} ⭐</b> пользователю <code>{user_id}</code>
-"
+        f"✅ Выдано <b>{amount} ⭐</b> пользователю <code>{user_id}</code>\n"
         f"💵 Новый баланс: {new_balance} ⭐",
         reply_markup=admin_back_keyboard()
     )
@@ -345,9 +307,7 @@ async def admin_take_start(callback: CallbackQuery, state: FSMContext):
         return
 
     await callback.message.edit_text(
-        "💸 <b>ЗАБРАТЬ ЗВЕЗДЫ</b>
-
-"
+        "💸 <b>ЗАБРАТЬ ЗВЕЗДЫ</b>\n\n"
         "Введи ID пользователя:",
         reply_markup=cancel_keyboard()
     )
@@ -374,11 +334,8 @@ async def admin_take_id_process(message: Message, state: FSMContext):
 
     await state.update_data(target_user_id=user_id)
     await message.answer(
-        f"💸 Забор звезд у пользователя <code>{user_id}</code>
-"
-        f"💵 Текущий баланс: {user['balance']} ⭐
-
-"
+        f"💸 Забор звезд у пользователя <code>{user_id}</code>\n"
+        f"💵 Текущий баланс: {user['balance']} ⭐\n\n"
         f"Введи количество звезд для забора:",
         reply_markup=cancel_keyboard()
     )
@@ -410,8 +367,7 @@ async def admin_take_amount_process(message: Message, state: FSMContext):
     new_balance = db.get_balance(user_id)
 
     await message.answer(
-        f"✅ Забрано <b>{actual_take} ⭐</b> у пользователя <code>{user_id}</code>
-"
+        f"✅ Забрано <b>{actual_take} ⭐</b> у пользователя <code>{user_id}</code>\n"
         f"💵 Новый баланс: {new_balance} ⭐",
         reply_markup=admin_back_keyboard()
     )
@@ -425,9 +381,7 @@ async def admin_create_promo_start(callback: CallbackQuery, state: FSMContext):
         return
 
     await callback.message.edit_text(
-        "🎁 <b>СОЗДАТЬ ПРОМОКОД</b>
-
-"
+        "🎁 <b>СОЗДАТЬ ПРОМОКОД</b>\n\n"
         "Введи название промокода (только латиница и цифры):",
         reply_markup=cancel_keyboard()
     )
@@ -448,9 +402,7 @@ async def admin_promo_code_process(message: Message, state: FSMContext):
 
     await state.update_data(promo_code=code)
     await message.answer(
-        f"🎁 Промокод: <code>{code}</code>
-
-"
+        f"🎁 Промокод: <code>{code}</code>\n\n"
         f"Введи количество звезд:",
         reply_markup=cancel_keyboard()
     )
@@ -474,9 +426,7 @@ async def admin_promo_stars_process(message: Message, state: FSMContext):
 
     await state.update_data(promo_stars=stars)
     await message.answer(
-        f"💎 Звезд: {stars}
-
-"
+        f"💎 Звезд: {stars}\n\n"
         f"Введи количество активаций:",
         reply_markup=cancel_keyboard()
     )
@@ -506,13 +456,9 @@ async def admin_promo_activations_process(message: Message, state: FSMContext):
 
     if success:
         await message.answer(
-            f"✅ <b>ПРОМОКОД СОЗДАН!</b>
-
-"
-            f"🎁 Код: <code>{code}</code>
-"
-            f"💎 Звезд: {stars} ⭐
-"
+            f"✅ <b>ПРОМОКОД СОЗДАН!</b>\n\n"
+            f"🎁 Код: <code>{code}</code>\n"
+            f"💎 Звезд: {stars} ⭐\n"
             f"🔢 Активаций: {activations}",
             reply_markup=admin_back_keyboard()
         )
@@ -536,17 +482,12 @@ async def admin_list_promos(callback: CallbackQuery):
     if not promos:
         text = "📋 Промокодов нет."
     else:
-        text = "📋 <b>СПИСОК ПРОМОКОДОВ:</b>
-
-"
+        text = "📋 <b>СПИСОК ПРОМОКОДОВ:</b>\n\n"
         for p in promos[:20]:
             status = "✅" if p['is_active'] else "❌"
             text += (
-                f"{status} <code>{p['code']}</code>
-"
-                f"   💎 {p['stars']} ⭐ | 🔢 {p['current_activations']}/{p['max_activations']}
-
-"
+                f"{status} <code>{p['code']}</code>\n"
+                f"   💎 {p['stars']} ⭐ | 🔢 {p['current_activations']}/{p['max_activations']}\n\n"
             )
 
     await callback.message.edit_text(text, reply_markup=admin_back_keyboard())
@@ -559,9 +500,7 @@ async def admin_broadcast_start(callback: CallbackQuery, state: FSMContext):
         return
 
     await callback.message.edit_text(
-        "📢 <b>РАССЫЛКА</b>
-
-"
+        "📢 <b>РАССЫЛКА</b>\n\n"
         "Отправь сообщение для рассылки всем пользователям:",
         reply_markup=cancel_keyboard()
     )
@@ -597,13 +536,9 @@ async def admin_broadcast_process(message: Message, state: FSMContext, bot: Bot)
     db.add_broadcast(message.text or "media", message.from_user.id, total, success, failed)
 
     await status_msg.edit_text(
-        f"✅ <b>РАССЫЛКА ЗАВЕРШЕНА!</b>
-
-"
-        f"📊 Всего пользователей: {total}
-"
-        f"✅ Доставлено: {success}
-"
+        f"✅ <b>РАССЫЛКА ЗАВЕРШЕНА!</b>\n\n"
+        f"📊 Всего пользователей: {total}\n"
+        f"✅ Доставлено: {success}\n"
         f"❌ Не доставлено: {failed}",
         reply_markup=admin_back_keyboard()
     )
@@ -619,12 +554,8 @@ async def admin_min_withdraw_start(callback: CallbackQuery, state: FSMContext):
     current = db.get_min_withdraw()
 
     await callback.message.edit_text(
-        f"⚙️ <b>МИНИМАЛЬНЫЙ ВЫВОД</b>
-
-"
-        f"Текущее значение: {current} ⭐
-
-"
+        f"⚙️ <b>МИНИМАЛЬНЫЙ ВЫВОД</b>\n\n"
+        f"Текущее значение: {current} ⭐\n\n"
         f"Введи новое значение:",
         reply_markup=cancel_keyboard()
     )
@@ -664,19 +595,12 @@ async def admin_stats(callback: CallbackQuery):
     stats = db.get_stats()
 
     await callback.message.edit_text(
-        f"📊 <b>ПОЛНАЯ СТАТИСТИКА</b>
-
-"
-        f"👥 Всего пользователей: {stats['total_users']}
-"
-        f"🔨 Забанено: {stats['banned']}
-"
-        f"👑 Админов: {stats['admins']}
-"
-        f"🎮 Всего игр: {stats['total_games']}
-"
-        f"💰 Всего звезд в боте: {stats['total_stars']} ⭐
-"
+        f"📊 <b>ПОЛНАЯ СТАТИСТИКА</b>\n\n"
+        f"👥 Всего пользователей: {stats['total_users']}\n"
+        f"🔨 Забанено: {stats['banned']}\n"
+        f"👑 Админов: {stats['admins']}\n"
+        f"🎮 Всего игр: {stats['total_games']}\n"
+        f"💰 Всего звезд в боте: {stats['total_stars']} ⭐\n"
         f"🎁 Активных промокодов: {stats['active_promos']}",
         reply_markup=admin_back_keyboard()
     )

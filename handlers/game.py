@@ -24,19 +24,11 @@ async def start_upgrade(callback: CallbackQuery, state: FSMContext):
     balance = db.get_balance(user_id)
 
     await callback.message.edit_text(
-        f"🎰 <b>АПГРЕЙД ЗВЕЗД</b>
-
-"
-        f"💰 Твой баланс: <b>{balance} ⭐</b>
-
-"
-        f"📝 Введи сумму ставки (мин. {MIN_BET} ⭐):
-
-"
-        f"🎯 Шанс победы: ~35%
-"
-        f"💎 При выигрыше: <b>x1.5</b> от ставки
-"
+        f"🎰 <b>АПГРЕЙД ЗВЕЗД</b>\n\n"
+        f"💰 Твой баланс: <b>{balance} ⭐</b>\n\n"
+        f"📝 Введи сумму ставки (мин. {MIN_BET} ⭐):\n\n"
+        f"🎯 Шанс победы: ~35%\n"
+        f"💎 При выигрыше: <b>x1.5</b> от ставки\n"
         f"💀 При проигрыше: теряешь ставку",
         reply_markup=cancel_keyboard()
     )
@@ -54,25 +46,19 @@ async def process_bet(message: Message, state: FSMContext):
     try:
         bet = int(message.text.strip())
         if bet < MIN_BET:
-            await message.answer(f"❌ Минимальная ставка: {MIN_BET} ⭐
-Попробуй еще раз:", reply_markup=cancel_keyboard())
+            await message.answer(f"❌ Минимальная ставка: {MIN_BET} ⭐\nПопробуй еще раз:", reply_markup=cancel_keyboard())
             return
     except ValueError:
-        await message.answer("❌ Введи число!
-Попробуй еще раз:", reply_markup=cancel_keyboard())
+        await message.answer("❌ Введи число!\nПопробуй еще раз:", reply_markup=cancel_keyboard())
         return
 
     balance = db.get_balance(user_id)
 
     if bet > balance:
         await message.answer(
-            f"❌ Недостаточно звезд!
-"
-            f"💰 Баланс: {balance} ⭐
-"
-            f"💳 Нужно: {bet} ⭐
-
-"
+            f"❌ Недостаточно звезд!\n"
+            f"💰 Баланс: {balance} ⭐\n"
+            f"💳 Нужно: {bet} ⭐\n\n"
             f"Пополни баланс или уменьши ставку.",
             reply_markup=back_keyboard()
         )
@@ -94,16 +80,10 @@ async def process_bet(message: Message, state: FSMContext):
         new_balance = db.get_balance(user_id)
 
         await message.answer(
-            f"🎉 <b>ПОБЕДА!</b>
-
-"
-            f"💰 Ставка: {bet} ⭐
-"
-            f"💎 Выигрыш: +{win_amount - bet} ⭐
-"
-            f"💵 Новый баланс: {new_balance} ⭐
-
-"
+            f"🎉 <b>ПОБЕДА!</b>\n\n"
+            f"💰 Ставка: {bet} ⭐\n"
+            f"💎 Выигрыш: +{win_amount - bet} ⭐\n"
+            f"💵 Новый баланс: {new_balance} ⭐\n\n"
             f"Хочешь еще раз?",
             reply_markup=back_keyboard()
         )
@@ -114,16 +94,10 @@ async def process_bet(message: Message, state: FSMContext):
         new_balance = db.get_balance(user_id)
 
         await message.answer(
-            f"💀 <b>ПРОИГРЫШ!</b>
-
-"
-            f"💰 Ставка: {bet} ⭐
-"
-            f"📉 Потерял: -{bet} ⭐
-"
-            f"💵 Баланс: {new_balance} ⭐
-
-"
+            f"💀 <b>ПРОИГРЫШ!</b>\n\n"
+            f"💰 Ставка: {bet} ⭐\n"
+            f"📉 Потерял: -{bet} ⭐\n"
+            f"💵 Баланс: {new_balance} ⭐\n\n"
             f"Попробуешь еще?",
             reply_markup=back_keyboard()
         )
@@ -135,12 +109,8 @@ async def cancel_action(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     user_id = callback.from_user.id
     await callback.message.edit_text(
-        f"🎰 <b>Stars Casino</b>
-
-"
-        f"💰 Твой баланс: <b>{db.get_balance(user_id)} ⭐</b>
-
-"
+        f"🎰 <b>Stars Casino</b>\n\n"
+        f"💰 Твой баланс: <b>{db.get_balance(user_id)} ⭐</b>\n\n"
         f"Выбери действие:",
         reply_markup=main_menu_keyboard()
     )

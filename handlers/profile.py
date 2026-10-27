@@ -36,32 +36,17 @@ async def show_profile(callback: CallbackQuery):
     username = f"@{user['username']}" if user['username'] else "нет"
 
     await callback.message.edit_text(
-        f"👤 <b>ПРОФИЛЬ</b>
-
-"
-        f"🆔 ID: <code>{user_id}</code>
-"
-        f"👤 Ник: {username}
-"
-        f"📛 Имя: {user['first_name'] or 'нет'}
-
-"
-        f"💰 Баланс: <b>{user['balance']} ⭐</b>
-
-"
-        f"📊 <b>СТАТИСТИКА:</b>
-"
-        f"🎮 Всего игр: {games}
-"
-        f"✅ Побед: {wins}
-"
-        f"❌ Поражений: {losses}
-"
-        f"📈 Винрейт: {winrate:.1f}%
-
-"
-        f"💎 Всего выиграно: {won_stars} ⭐
-"
+        f"👤 <b>ПРОФИЛЬ</b>\n\n"
+        f"🆔 ID: <code>{user_id}</code>\n"
+        f"👤 Ник: {username}\n"
+        f"📛 Имя: {user['first_name'] or 'нет'}\n\n"
+        f"💰 Баланс: <b>{user['balance']} ⭐</b>\n\n"
+        f"📊 <b>СТАТИСТИКА:</b>\n"
+        f"🎮 Всего игр: {games}\n"
+        f"✅ Побед: {wins}\n"
+        f"❌ Поражений: {losses}\n"
+        f"📈 Винрейт: {winrate:.1f}%\n\n"
+        f"💎 Всего выиграно: {won_stars} ⭐\n"
         f"📉 Всего проиграно: {lost_stars} ⭐",
         reply_markup=profile_keyboard()
     )
@@ -79,22 +64,16 @@ async def start_withdraw(callback: CallbackQuery, state: FSMContext):
 
     if balance < min_withdraw:
         await callback.answer(
-            f"❌ Минимальная сумма вывода: {min_withdraw} ⭐
-"
+            f"❌ Минимальная сумма вывода: {min_withdraw} ⭐\n"
             f"💰 Твой баланс: {balance} ⭐",
             show_alert=True
         )
         return
 
     await callback.message.edit_text(
-        f"💸 <b>ВЫВОД ЗВЕЗД</b>
-
-"
-        f"💰 Баланс: {balance} ⭐
-"
-        f"📉 Мин. вывод: {min_withdraw} ⭐
-
-"
+        f"💸 <b>ВЫВОД ЗВЕЗД</b>\n\n"
+        f"💰 Баланс: {balance} ⭐\n"
+        f"📉 Мин. вывод: {min_withdraw} ⭐\n\n"
         f"Введи сумму для вывода:",
         reply_markup=cancel_keyboard()
     )
@@ -123,8 +102,7 @@ async def process_withdraw(message: Message, state: FSMContext):
 
     if amount < min_withdraw:
         await message.answer(
-            f"❌ Минимальная сумма вывода: {min_withdraw} ⭐
-"
+            f"❌ Минимальная сумма вывода: {min_withdraw} ⭐\n"
             f"Попробуй еще раз:",
             reply_markup=cancel_keyboard()
         )
@@ -132,13 +110,9 @@ async def process_withdraw(message: Message, state: FSMContext):
 
     if amount > balance:
         await message.answer(
-            f"❌ Недостаточно звезд!
-"
-            f"💰 Баланс: {balance} ⭐
-"
-            f"📉 Запросил: {amount} ⭐
-
-"
+            f"❌ Недостаточно звезд!\n"
+            f"💰 Баланс: {balance} ⭐\n"
+            f"📉 Запросил: {amount} ⭐\n\n"
             f"Попробуй еще раз:",
             reply_markup=cancel_keyboard()
         )
@@ -149,16 +123,10 @@ async def process_withdraw(message: Message, state: FSMContext):
     new_balance = db.get_balance(user_id)
 
     await message.answer(
-        f"✅ <b>ЗАЯВКА НА ВЫВОД СОЗДАНА!</b>
-
-"
-        f"💸 Сумма: {amount} ⭐
-"
-        f"💰 Остаток: {new_balance} ⭐
-
-"
-        f"📱 Для получения звезд напиши: @v1nk_molik
-"
+        f"✅ <b>ЗАЯВКА НА ВЫВОД СОЗДАНА!</b>\n\n"
+        f"💸 Сумма: {amount} ⭐\n"
+        f"💰 Остаток: {new_balance} ⭐\n\n"
+        f"📱 Для получения звезд напиши: @v1nk_molik\n"
         f"🆔 Укажи свой ID: <code>{user_id}</code>",
         reply_markup=back_keyboard()
     )
@@ -173,9 +141,7 @@ async def start_activate_promo(callback: CallbackQuery, state: FSMContext):
         return
 
     await callback.message.edit_text(
-        f"🎁 <b>АКТИВАЦИЯ ПРОМОКОДА</b>
-
-"
+        f"🎁 <b>АКТИВАЦИЯ ПРОМОКОДА</b>\n\n"
         f"Введи промокод:",
         reply_markup=cancel_keyboard()
     )
@@ -195,8 +161,7 @@ async def process_promo(message: Message, state: FSMContext):
 
     if not promo:
         await message.answer(
-            f"❌ Промокод не найден или неактивен!
-"
+            f"❌ Промокод не найден или неактивен!\n"
             f"Попробуй еще раз:",
             reply_markup=cancel_keyboard()
         )
@@ -207,13 +172,9 @@ async def process_promo(message: Message, state: FSMContext):
     if success:
         new_balance = db.get_balance(user_id)
         await message.answer(
-            f"🎉 <b>ПРОМОКОД АКТИВИРОВАН!</b>
-
-"
-            f"🎁 Код: <code>{code}</code>
-"
-            f"💎 Получено: +{result} ⭐
-"
+            f"🎉 <b>ПРОМОКОД АКТИВИРОВАН!</b>\n\n"
+            f"🎁 Код: <code>{code}</code>\n"
+            f"💎 Получено: +{result} ⭐\n"
             f"💰 Баланс: {new_balance} ⭐",
             reply_markup=back_keyboard()
         )
